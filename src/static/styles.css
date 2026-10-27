@@ -16,6 +16,7 @@ body {
 }
 
 header {
+  position: relative;
   text-align: center;
   padding: 20px 0;
   margin-bottom: 30px;
@@ -197,4 +198,61 @@ footer {
   margin-top: 30px;
   padding: 20px;
   color: #666;
+}
+
+#user-menu {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  text-align: right;
+}
+
+#user-icon {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+#user-dropdown {
+  background: white;
+  color: #333;
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-align: left;
+}
+
+#user-dropdown span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  width: 90%;
+  max-width: 340px;
+}
+
+#login-error {
+  color: #c62828;
+  margin-bottom: 10px;
 }

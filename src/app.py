@@ -5,11 +5,16 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+import hmac
+import json
 import os
+import secrets
 from pathlib import Path
+from typing import Optional
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -18,6 +23,29 @@ app = FastAPI(title="Mergington High School API",
 current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
+
+# Teacher credentials live in a JSON file checked by the backend
+with open(current_dir / "teachers.json", encoding="utf-8") as f:
+    teachers = {t["username"]: t["password"] for t in json.load(f)["teachers"]}
+
+# Active login sessions: token -> username (in memory)
+sessions = {}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+def require_teacher(token: Optional[str]) -> str:
+    """Return the logged-in teacher's username or raise 401"""
+    if not token or token not in sessions:
+        raise HTTPException(
+            status_code=401,
+            detail="Teacher login required for this action"
+        )
+    return sessions[token]
+
 
 # In-memory activity database
 activities = {
@@ -88,9 +116,31 @@ def get_activities():
     return activities
 
 
+@app.post("/login")
+def login(credentials: LoginRequest):
+    """Log a teacher in and return a session token"""
+    expected = teachers.get(credentials.username)
+    if expected is None or not hmac.compare_digest(
+        expected.encode(), credentials.password.encode()
+    ):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = secrets.token_urlsafe(32)
+    sessions[token] = credentials.username
+    return {"token": token, "username": credentials.username}
+
+
+@app.post("/logout")
+def logout(x_auth_token: Optional[str] = Header(None)):
+    """Invalidate the current session"""
+    sessions.pop(x_auth_token, None)
+    return {"message": "Logged out"}
+
+
 @app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
-    """Sign up a student for an activity"""
+def signup_for_activity(activity_name: str, email: str,
+                        x_auth_token: Optional[str] = Header(None)):
+    """Sign up a student for an activity (teachers only)"""
+    require_teacher(x_auth_token)
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -111,8 +161,10 @@ def signup_for_activity(activity_name: str, email: str):
 
 
 @app.delete("/activities/{activity_name}/unregister")
-def unregister_from_activity(activity_name: str, email: str):
-    """Unregister a student from an activity"""
+def unregister_from_activity(activity_name: str, email: str,
+                             x_auth_token: Optional[str] = Header(None)):
+    """Unregister a student from an activity (teachers only)"""
+    require_teacher(x_auth_token)
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
